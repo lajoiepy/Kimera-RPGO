@@ -158,11 +158,13 @@ TEST(RobustSolver, RemoveLastLoopClosureNoOR) {
       10e-6));
 
   // Remove loop closure 1
-  pgo->removeLastLoopClosure('a', 'a');
+  EdgePtr removed_edge_1 = pgo->removeLastLoopClosure('a', 'a');
   nfg = pgo->getFactorsUnsafe();
   est = pgo->calculateEstimate();
   EXPECT(nfg.size() == size_t(13));
   EXPECT(est.size() == size_t(12));
+  EXPECT(removed_edge_1->from_key == gtsam::Symbol('a', 5));
+  EXPECT(removed_edge_1->to_key == gtsam::Symbol('a', 3));
   EXPECT(gtsam::assert_equal(
       gtsam::Pose3(), est.at<gtsam::Pose3>(gtsam::Symbol('b', 0)), 10e-6));
   EXPECT(gtsam::assert_equal(
@@ -171,11 +173,13 @@ TEST(RobustSolver, RemoveLastLoopClosureNoOR) {
       10e-6));
 
   // Remove loop closure 2
-  pgo->removeLastLoopClosure('a', 'b');
+  EdgePtr removed_edge_2 = pgo->removeLastLoopClosure('a', 'b');
   nfg = pgo->getFactorsUnsafe();
   est = pgo->calculateEstimate();
   EXPECT(nfg.size() == size_t(12));
   EXPECT(est.size() == size_t(12));
+  EXPECT(removed_edge_2->from_key == gtsam::Symbol('b', 0));
+  EXPECT(removed_edge_2->to_key == gtsam::Symbol('a', 0));
   EXPECT(
       gtsam::assert_equal(gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0, -1, 0)),
                           est.at<gtsam::Pose3>(gtsam::Symbol('b', 0)),
@@ -241,11 +245,13 @@ TEST(RobustSolver, RemoveLastLoopClosurePcm) {
       10e-6));
 
   // Remove loop closure 1
-  pgo->removeLastLoopClosure('a', 'a');
+  EdgePtr removed_edge_1 = pgo->removeLastLoopClosure('a', 'a');
   nfg = pgo->getFactorsUnsafe();
   est = pgo->calculateEstimate();
   EXPECT(nfg.size() == size_t(13));
   EXPECT(est.size() == size_t(12));
+  EXPECT(removed_edge_1->from_key == gtsam::Symbol('a', 5));
+  EXPECT(removed_edge_1->to_key == gtsam::Symbol('a', 3));
   EXPECT(gtsam::assert_equal(
       gtsam::Pose3(), est.at<gtsam::Pose3>(gtsam::Symbol('b', 0)), 10e-6));
   EXPECT(gtsam::assert_equal(
@@ -254,11 +260,13 @@ TEST(RobustSolver, RemoveLastLoopClosurePcm) {
       10e-6));
 
   // Remove loop closure 2
-  pgo->removeLastLoopClosure('a', 'b');
+  EdgePtr removed_edge_2 = pgo->removeLastLoopClosure('a', 'b');
   nfg = pgo->getFactorsUnsafe();
   est = pgo->calculateEstimate();
   EXPECT(nfg.size() == size_t(12));
   EXPECT(est.size() == size_t(12));
+  EXPECT(removed_edge_2->from_key == gtsam::Symbol('b', 0));
+  EXPECT(removed_edge_2->to_key == gtsam::Symbol('a', 0));
   EXPECT(
       gtsam::assert_equal(gtsam::Pose3(gtsam::Rot3(), gtsam::Point3(0, -1, 0)),
                           est.at<gtsam::Pose3>(gtsam::Symbol('b', 0)),

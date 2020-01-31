@@ -58,7 +58,7 @@ class RobustSolver : public GenericSolver {
    * For example, to remove the last measure loop closure between robots a and c
    * removeLastLoopClosure('a', 'c');
    */
-  void removeLastLoopClosure(char prefix_1, char prefix_2);
+  EdgePtr removeLastLoopClosure(char prefix_1, char prefix_2);
 
  private:
   std::unique_ptr<OutlierRemoval> outlier_removal_;  // outlier removal method;

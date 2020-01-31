@@ -223,16 +223,19 @@ class Pcm : public OutlierRemoval {
    * For example if Observation id is Obsid('a','c'), method
    * removes the last loop closure between robots a and c
    */
-  void removeLastLoopClosure(ObservationId id,
-                             gtsam::NonlinearFactorGraph* updated_factors) {
+  EdgePtr removeLastLoopClosure(ObservationId id,
+                                gtsam::NonlinearFactorGraph* updated_factors) {
     if (loop_closures_.find(id) == loop_closures_.end()) {
-      return;  // No loop closures in this container
+      return NULL;  // No loop closures in this container
     }
     // Update the measurements (delete last measurement)
     size_t numLC = loop_closures_[id].adj_matrix.rows();
     if (numLC <= 0) {
-      return;  // No more loop closures
+      return NULL;  // No more loop closures
     }
+    size_t num_lc = loop_closures_[id].factors.size();
+    Edge removed_edge = Edge(loop_closures_[id].factors[num_lc - 1]->front(),
+                             loop_closures_[id].factors[num_lc - 1]->back());
 
     loop_closures_[id].factors.erase(
         std::prev(loop_closures_[id].factors.end()));
@@ -259,7 +262,7 @@ class Pcm : public OutlierRemoval {
     }
 
     *updated_factors = buildGraphToOptimize();
-    return;
+    return make_unique<Edge>(removed_edge);
   }
 
  protected:

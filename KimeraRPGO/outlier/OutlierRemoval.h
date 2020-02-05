@@ -54,6 +54,11 @@ class OutlierRemoval {
       ObservationId id,
       gtsam::NonlinearFactorGraph* updated_factors) {}
 
+  /*! \brief Remove last measured loop closure regardless of obs id
+   */
+  virtual EdgePtr removeLastLoopClosure(
+      gtsam::NonlinearFactorGraph* updated_factors) {}
+
  protected:
   bool debug_ = true;
 };

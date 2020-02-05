@@ -140,6 +140,19 @@ EdgePtr RobustSolver::removeLastLoopClosure(char prefix_1, char prefix_2) {
   return removed_edge;
 }
 
+EdgePtr RobustSolver::removeLastLoopClosure() {
+  EdgePtr removed_edge;
+  if (outlier_removal_) {
+    // removing loop closure so values should not change
+    removed_edge = outlier_removal_->removeLastLoopClosure(&nfg_);
+  } else {
+    removed_edge = removeLastFactor();
+  }
+
+  optimize();
+  return removed_edge;
+}
+
 void RobustSolver::saveData(std::string folder_path) const {
   std::string g2o_file_path = folder_path + "/result.g2o";
   gtsam::writeG2o(nfg_, values_, g2o_file_path);

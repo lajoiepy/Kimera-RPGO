@@ -13,6 +13,7 @@ author: Yun Chang, Luca Carlone
 #include <math.h>
 #include <fstream>
 #include <iomanip>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -90,6 +91,9 @@ class Pcm : public OutlierRemoval {
 
   // storing landmark measurements and its adjacency matrix
   std::unordered_map<gtsam::Key, Measurements> landmarks_;
+
+  // store the vector of observations (loop closures)
+  std::vector<ObservationId> loop_closures_in_order_;
 
   size_t total_lc_, total_good_lc_;
 
@@ -265,6 +269,18 @@ class Pcm : public OutlierRemoval {
     return make_unique<Edge>(removed_edge);
   }
 
+  /*! \brief remove the last loop closure regardless of observation ID
+   * and update the factors.
+   * Removes the last loop closure based on chronological order
+   */
+  EdgePtr removeLastLoopClosure(gtsam::NonlinearFactorGraph* updated_factors) {
+    if (loop_closures_in_order_.size() == 0) return NULL;
+
+    ObservationId last_obs = loop_closures_in_order_.back();
+    loop_closures_in_order_.pop_back();
+    return removeLastLoopClosure(last_obs, updated_factors);
+  }
+
  protected:
   /*! \brief goes through the loop closures and updates the corresponding
    * adjacency matrices, in preparation for max clique
@@ -329,6 +345,7 @@ class Pcm : public OutlierRemoval {
             ObservationId obs_id(symbfrnt.chr(), symbback.chr());
             // detect which inter or intra robot loop closure this belongs to
             loop_closures_[obs_id].factors.add(nfg_factor);
+            loop_closures_in_order_.push_back(obs_id);
             total_lc_++;
             incrementAdjMatrix(obs_id, nfg_factor);
           } else {

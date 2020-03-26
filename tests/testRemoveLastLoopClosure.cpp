@@ -16,6 +16,7 @@
 #include "KimeraRPGO/utils/type_utils.h"
 #include "test_config.h"
 
+using KimeraRPGO::EdgePtr;
 using KimeraRPGO::RobustSolver;
 using KimeraRPGO::RobustSolverParams;
 using KimeraRPGO::Verbosity;

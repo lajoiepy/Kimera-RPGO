@@ -36,9 +36,8 @@ struct RobustSolverParams {
         verbosity(Verbosity::UPDATE),
         pcm_odomThreshold(10.0),
         pcm_lcThreshold(5.0),
-        pcmDist_transThreshold(0.05),  // 5cm
-        pcmDist_rotThreshold(0.005),
-        log_performance(false) {}  // <0.5degrees
+        pcmDist_transThreshold(0.05),   // 5cm
+        pcmDist_rotThreshold(0.005) {}  // <0.5degrees
 
   /*! \brief For RobustSolver to not do outlier rejection at all
    */
@@ -105,14 +104,6 @@ struct RobustSolverParams {
     verbosity = verbos;
   }
 
-  /*! \brief enable logging
-   * path: path to folder to store log file
-   */
-  void enableLogging(string path) {
-    log_performance = true;
-    log_path = path;
-  }
-
   // General
   Solver solver;
   OutlierRemovalMethod outlierRemovalMethod;
@@ -126,10 +117,6 @@ struct RobustSolverParams {
   // for PcmSimple
   double pcmDist_transThreshold;
   double pcmDist_rotThreshold;
-
-  // Logging
-  bool log_performance;
-  string log_path;
 };
 
 }  // namespace KimeraRPGO

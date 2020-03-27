@@ -55,9 +55,7 @@ class Pcm : public OutlierRemoval {
  public:
   Pcm(double threshold1,
       double threshold2,
-      const std::vector<char>& special_symbols = std::vector<char>(),
-      bool log = false,
-      std::string log_path = "")
+      const std::vector<char>& special_symbols = std::vector<char>())
       : OutlierRemoval(),
         threshold1_(threshold1),
         threshold2_(threshold2),
@@ -67,9 +65,7 @@ class Pcm : public OutlierRemoval {
         total_landmark_measurements_(0),
         total_landmark_inliers_(0),
         total_multirobot_lc_(0),
-        total_multirobot_lc_inliers_(0),
-        log_(log),
-        log_path_(log_path) {
+        total_multirobot_lc_inliers_(0) {
     // check if templated value valid
     BOOST_CONCEPT_ASSERT((gtsam::IsLieGroup<poseT>));
   }
@@ -82,10 +78,6 @@ class Pcm : public OutlierRemoval {
  private:
   double threshold1_;
   double threshold2_;
-
-  // logging
-  bool log_;
-  std::string log_path_;
 
   // NonlinearFactorGraph storing all odometry factors
   gtsam::NonlinearFactorGraph nfg_odom_;
@@ -118,6 +110,15 @@ class Pcm : public OutlierRemoval {
  public:
   size_t getNumLC() { return total_lc_; }
   size_t getNumLCInliers() { return total_lc_inliers_; }
+
+  Stats getRejectionStats() {
+    return Stats(total_lc_,
+                 total_lc_inliers_,
+                 total_multirobot_lc_,
+                 total_multirobot_lc_inliers_,
+                 total_landmark_measurements_,
+                 total_landmark_inliers_);
+  }
 
   /*! \brief Process new measurements and reject outliers
    *  process the new measurements and update the "good set" of measurements

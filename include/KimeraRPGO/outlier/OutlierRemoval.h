@@ -25,6 +25,7 @@ class OutlierRemoval {
 
   virtual size_t getNumLC() {}
   virtual size_t getNumLCInliers() {}
+  virtual Stats getRejectionStats() {}
 
   /*! \brief Process new measurements and reject outliers
    *  process the new measurements and update the "good set" of measurements

@@ -78,8 +78,14 @@ class RobustSolver : public GenericSolver {
    */
   std::vector<char> getIgnoredPrefixes();
 
+  /*! \brief logging data to directory indicated by path
+   */
+  void enableLogging(std::string path);
+
  private:
   std::unique_ptr<OutlierRemoval> outlier_removal_;  // outlier removal method;
+  bool log_;                                         // log performance
+  std::string(log_path_);
 
   /*! \brief Calling the optimization
    *  Optimize the factor graph with the stroed values

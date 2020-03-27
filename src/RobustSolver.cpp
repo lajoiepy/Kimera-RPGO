@@ -24,7 +24,7 @@ namespace KimeraRPGO {
 typedef std::pair<gtsam::NonlinearFactorGraph, gtsam::Values> GraphAndValues;
 
 RobustSolver::RobustSolver(const RobustSolverParams& params)
-    : GenericSolver(params.solver, params.specialSymbols) {
+    : GenericSolver(params.solver, params.specialSymbols), log_(false) {
   switch (params.outlierRemovalMethod) {
     case OutlierRemovalMethod::NONE: {
       outlier_removal_ =
@@ -34,33 +34,25 @@ RobustSolver::RobustSolver(const RobustSolverParams& params)
       outlier_removal_ =
           KimeraRPGO::make_unique<Pcm2D>(params.pcm_odomThreshold,
                                          params.pcm_lcThreshold,
-                                         params.specialSymbols,
-                                         params.log_performance,
-                                         params.log_path);
+                                         params.specialSymbols);
     } break;
     case OutlierRemovalMethod::PCM3D: {
       outlier_removal_ =
           KimeraRPGO::make_unique<Pcm3D>(params.pcm_odomThreshold,
                                          params.pcm_lcThreshold,
-                                         params.specialSymbols,
-                                         params.log_performance,
-                                         params.log_path);
+                                         params.specialSymbols);
     } break;
     case OutlierRemovalMethod::PCM_Simple2D: {
       outlier_removal_ =
           KimeraRPGO::make_unique<PcmSimple2D>(params.pcmDist_transThreshold,
                                                params.pcmDist_rotThreshold,
-                                               params.specialSymbols,
-                                               params.log_performance,
-                                               params.log_path);
+                                               params.specialSymbols);
     } break;
     case OutlierRemovalMethod::PCM_Simple3D: {
       outlier_removal_ =
           KimeraRPGO::make_unique<PcmSimple3D>(params.pcmDist_transThreshold,
                                                params.pcmDist_rotThreshold,
-                                               params.specialSymbols,
-                                               params.log_performance,
-                                               params.log_path);
+                                               params.specialSymbols);
     } break;
     default: {
       log<WARNING>("Undefined outlier removal method");
@@ -132,6 +124,19 @@ void RobustSolver::update(const gtsam::NonlinearFactorGraph& factors,
   }
 
   if (do_optimize) optimize();  // optimize once after loading
+  if (log_) {
+    Stats stats = outlier_removal_->getRejectionStats();
+    double error = nfg_.error(values_);
+    // Write/append to file
+    std::string file_name = log_path_ + "/log.txt";
+    std::ofstream logfile;
+    logfile.open(file_name, std::ios::app);  // append instead of overwrite
+    logfile << stats.lc << " " << stats.good_lc << " " << stats.multirobot_lc
+            << " " << stats.good_multirobot_lc << " "
+            << stats.landmark_measurements << " "
+            << stats.good_landmark_measurements << " " << error << std::endl;
+    logfile.close();
+  }
   return;
 }
 
@@ -206,6 +211,19 @@ void RobustSolver::saveData(std::string folder_path) const {
   if (outlier_removal_) {
     outlier_removal_->saveData(folder_path);
   }
+}
+
+void RobustSolver::enableLogging(std::string path) {
+  log_ = true;
+  log_path_ = path;
+  // Initialize log file
+  std::string file_name = path + "/log.txt";
+  std::ofstream logfile;
+  logfile.open(file_name);  // append instead of overwrite
+  logfile << "#lc #good-lc #multirobot-lc #good-multirobot-lc "
+             "#ldmrk-measurements #good-ldmrk-measurements #error"
+          << std::endl;
+  logfile.close();
 }
 
 }  // namespace KimeraRPGO

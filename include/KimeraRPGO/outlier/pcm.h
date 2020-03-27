@@ -55,13 +55,21 @@ class Pcm : public OutlierRemoval {
  public:
   Pcm(double threshold1,
       double threshold2,
-      const std::vector<char>& special_symbols = std::vector<char>())
+      const std::vector<char>& special_symbols = std::vector<char>(),
+      bool log = false,
+      std::string log_path = "")
       : OutlierRemoval(),
         threshold1_(threshold1),
         threshold2_(threshold2),
         special_symbols_(special_symbols),
         total_lc_(0),
-        total_good_lc_(0) {
+        total_lc_inliers_(0),
+        total_landmark_measurements_(0),
+        total_landmark_inliers_(0),
+        total_multirobot_lc_(0),
+        total_multirobot_lc_inliers_(0),
+        log_(log),
+        log_path_(log_path) {
     // check if templated value valid
     BOOST_CONCEPT_ASSERT((gtsam::IsLieGroup<poseT>));
   }
@@ -74,6 +82,10 @@ class Pcm : public OutlierRemoval {
  private:
   double threshold1_;
   double threshold2_;
+
+  // logging
+  bool log_;
+  std::string log_path_;
 
   // NonlinearFactorGraph storing all odometry factors
   gtsam::NonlinearFactorGraph nfg_odom_;
@@ -96,14 +108,16 @@ class Pcm : public OutlierRemoval {
   // store the vector of observations (loop closures)
   std::vector<ObservationId> loop_closures_in_order_;
 
-  size_t total_lc_, total_good_lc_;
+  size_t total_lc_, total_lc_inliers_, total_landmark_measurements_,
+      total_landmark_inliers_, total_multirobot_lc_,
+      total_multirobot_lc_inliers_;
 
   // store the vector of ignored prefixes (loop closures to ignore)
   std::vector<char> ignored_prefixes_;
 
  public:
   size_t getNumLC() { return total_lc_; }
-  size_t getNumLCInliers() { return total_good_lc_; }
+  size_t getNumLCInliers() { return total_lc_inliers_; }
 
   /*! \brief Process new measurements and reject outliers
    *  process the new measurements and update the "good set" of measurements
@@ -183,7 +197,7 @@ class Pcm : public OutlierRemoval {
           newMeasurement.consistent_factors.add(new_factors[i]);
           gtsam::Symbol symb(new_values.keys()[0]);
           landmarks_[symb] = newMeasurement;
-          total_lc_++;
+          total_landmark_measurements_++;
         } break;
         case FactorType::LOOP_CLOSURE: {
           if (new_factors[i]->front() != new_factors[i]->back()) {
@@ -357,17 +371,19 @@ class Pcm : public OutlierRemoval {
                 gtsam::DefaultKeyFormatter(landmark_key);
 
           landmarks_[landmark_key].factors.add(nfg_factor);
-          total_lc_++;
+          total_landmark_measurements_++;
           // grow adj matrix
           incrementLandmarkAdjMatrix(landmark_key);
         } else {
           // It is a proper loop closures
+          total_lc_++;
           double odom_dist;
           bool odom_consistent = false;
           if (symbfrnt.chr() == symbback.chr()) {
             odom_consistent = isOdomConsistent(nfg_factor, &odom_dist);
           } else {
             // odom consistency check only for intrarobot loop closures
+            total_multirobot_lc_++;
             odom_consistent = true;
           }
           if (odom_consistent) {
@@ -379,7 +395,6 @@ class Pcm : public OutlierRemoval {
             // detect which inter or intra robot loop closure this belongs to
             loop_closures_[obs_id].factors.add(nfg_factor);
             loop_closures_in_order_.push_back(obs_id);
-            total_lc_++;
             incrementAdjMatrix(obs_id, nfg_factor);
           } else {
             if (debug_)
@@ -742,7 +757,8 @@ class Pcm : public OutlierRemoval {
    */
   void findInliers() {
     if (debug_) log<INFO>("total loop closures registered: %1%") % total_lc_;
-    total_good_lc_ = 0;
+    total_lc_inliers_ = 0;
+    total_multirobot_lc_inliers_ = 0;
     // iterate through loop closures and find inliers
     std::unordered_map<ObservationId, Measurements>::iterator it =
         loop_closures_.begin();
@@ -757,10 +773,14 @@ class Pcm : public OutlierRemoval {
         it->second.consistent_factors.add(it->second.factors[inliers_idx[i]]);
       }
       it++;
-      total_good_lc_ = total_good_lc_ + num_inliers;
+      total_lc_inliers_ = total_lc_inliers_ + num_inliers;
+      if (it->first.id1 != it->first.id2)
+        total_multirobot_lc_inliers_ =
+            total_multirobot_lc_inliers_ + num_inliers;
     }
 
     // iterate through landmarks and find inliers
+    total_landmark_inliers_ = 0;
     std::unordered_map<gtsam::Key, Measurements>::iterator it_ldmrk =
         landmarks_.begin();
     while (it_ldmrk != landmarks_.end()) {
@@ -776,9 +796,15 @@ class Pcm : public OutlierRemoval {
             it_ldmrk->second.factors[inliers_idx[i]]);
       }
       it_ldmrk++;
-      total_good_lc_ = total_good_lc_ + num_inliers;
+      total_landmark_inliers_ = total_landmark_inliers_ + num_inliers;
     }
-    if (debug_) log<INFO>("number of inliers: %1%") % total_good_lc_;
+    if (debug_) {
+      log<INFO>("number of good loop closures: %1%") % total_lc_inliers_;
+      log<INFO>("number of good multirobot loop closures: %1%") %
+          total_multirobot_lc_inliers_;
+      log<INFO>("number of good landmark measurements: %1%") %
+          total_landmark_inliers_;
+    }
   }
 
   /* *******************************************************************************

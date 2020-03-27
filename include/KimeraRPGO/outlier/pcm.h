@@ -773,13 +773,12 @@ class Pcm : public OutlierRemoval {
       for (size_t i = 0; i < num_inliers; i++) {
         it->second.consistent_factors.add(it->second.factors[inliers_idx[i]]);
       }
-      it++;
       total_lc_inliers_ = total_lc_inliers_ + num_inliers;
       if (it->first.id1 != it->first.id2)
         total_multirobot_lc_inliers_ =
             total_multirobot_lc_inliers_ + num_inliers;
+      it++;
     }
-
     // iterate through landmarks and find inliers
     total_landmark_inliers_ = 0;
     std::unordered_map<gtsam::Key, Measurements>::iterator it_ldmrk =

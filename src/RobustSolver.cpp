@@ -143,11 +143,6 @@ void RobustSolver::update(const gtsam::NonlinearFactorGraph& factors,
     for (const double e : stats.consistency_error) errorfile << e << " ";
     errorfile << std::endl;
     errorfile.close();
-
-    // log g2o files
-    if (outlier_removal_) {
-      outlier_removal_->saveData(log_path_);
-    }
   }
   return;
 }

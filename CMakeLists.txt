@@ -30,17 +30,17 @@ endif()
 ###########################################################################
 # Compile
 add_library(kimera_rpgo SHARED
-  include/KimeraRPGO/logger.h
+  include/kimera_rpgo/logger.h
   src/GenericSolver.cpp
   src/RobustSolver.cpp
-  include/KimeraRPGO/SolverParams.h )
+  include/kimera_rpgo/SolverParams.h )
 include_directories(include)
 # Add source code for max clique finder
-add_subdirectory(include/KimeraRPGO/max_clique_finder)
+add_subdirectory(include/kimera_rpgo/max_clique_finder)
 # Add source for outlier rejection stuff
-add_subdirectory(include/KimeraRPGO/outlier)
+add_subdirectory(include/kimera_rpgo/outlier)
 # Add source for utils
-add_subdirectory(include/KimeraRPGO/utils)
+add_subdirectory(include/kimera_rpgo/utils)
 add_subdirectory(src/utils)
 
 target_include_directories(kimera_rpgo PUBLIC

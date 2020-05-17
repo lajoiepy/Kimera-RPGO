@@ -68,6 +68,8 @@ add_executable(RpgoReadG2o examples/RpgoReadG2o.cpp)
 target_link_libraries(RpgoReadG2o kimera_rpgo)
 add_executable(GenerateTrajectories examples/GenerateTrajectories.cpp)
 target_link_libraries(GenerateTrajectories gtsam)
+add_executable(PostAnalysis examples/PostAnalysis.cpp)
+target_link_libraries(PostAnalysis gtsam)
 
 ###########################################################################
 # Tests

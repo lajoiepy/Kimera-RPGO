@@ -10,6 +10,7 @@ author: Yun Chang, Luca Carlone
 #define SLOW_BUT_CORRECT_BETWEENFACTOR
 
 #include <math.h>
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -25,6 +26,7 @@ author: Yun Chang, Luca Carlone
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/slam/PriorFactor.h>
+#include <gtsam/slam/dataset.h>
 
 #include "kimera_rpgo/logger.h"
 #include "kimera_rpgo/outlier/OutlierRemoval.h"
@@ -91,6 +93,12 @@ class Pcm : public OutlierRemoval {
   std::unordered_map<gtsam::Key, Measurements> landmarks_;
 
   size_t total_lc_, total_good_lc_;
+
+  // values and factors graphs for logging
+  gtsam::Values values_;
+  gtsam::NonlinearFactorGraph last_ouput_nfg_;
+  gtsam::NonlinearFactorGraph odom_inconsistent_factors_;
+  gtsam::NonlinearFactorGraph pairwise_inconsistent_factors_;
 
  public:
   size_t getNumLC() { return total_lc_; }
@@ -205,6 +213,9 @@ class Pcm : public OutlierRemoval {
       do_optimize = true;
     }
     *output_nfg = buildGraphToOptimize();
+
+    values_ = *output_values;
+    last_ouput_nfg_ = *output_nfg;
     return do_optimize;
   }  // end reject outliers
 
@@ -213,9 +224,13 @@ class Pcm : public OutlierRemoval {
    *  - folder_path: path to directory to save results in
    */
   void saveData(std::string folder_path) override {
-    // TODO(Yun) save max clique results
-    // saveDistanceMatrix(folder_path);
-    // saveCliqueSizeData(folder_path);
+    // Save g2o files for post analysis
+    std::string result_g2o = folder_path + "/result.g2o";
+    gtsam::writeG2o(last_ouput_nfg_, values_, result_g2o);
+    std::string odom_g2o = folder_path + "/odom_inconsistent.g2o";
+    gtsam::writeG2o(odom_inconsistent_factors_, values_, odom_g2o);
+    std::string pw_g2o = folder_path + "/pairwise_inconsistent.g2o";
+    gtsam::writeG2o(pairwise_inconsistent_factors_, values_, pw_g2o);
   }
 
   /*! \brief remove the last loop closure based on observation ID
@@ -329,6 +344,7 @@ class Pcm : public OutlierRemoval {
             total_lc_++;
             incrementAdjMatrix(obs_id, nfg_factor);
           } else {
+            odom_inconsistent_factors_.add(nfg_factor);
             if (debug_)
               log<WARNING>(
                   "Discarded loop closure (inconsistent with odometry)");
@@ -689,6 +705,8 @@ class Pcm : public OutlierRemoval {
    */
   void findInliers() {
     if (debug_) log<INFO>("total loop closures registered: %1%") % total_lc_;
+    pairwise_inconsistent_factors_ = gtsam::NonlinearFactorGraph();  // reset
+
     total_good_lc_ = 0;
     // iterate through loop closures and find inliers
     std::unordered_map<ObservationId, Measurements>::iterator it =
@@ -699,12 +717,18 @@ class Pcm : public OutlierRemoval {
       // find max clique
       size_t num_inliers =
           findMaxCliqueHeu(it->second.adj_matrix, &inliers_idx);
+      std::sort(inliers_idx.begin(), inliers_idx.end());  // sort
+      gtsam::NonlinearFactorGraph outlier_factors = it->second.factors.clone();
       // update inliers, or consistent factors, according to max clique result
-      for (size_t i = 0; i < num_inliers; i++) {
-        it->second.consistent_factors.add(it->second.factors[inliers_idx[i]]);
+      // itreate in reverse order and update outliers
+      for (size_t i = num_inliers; i > 0; --i) {
+        outlier_factors.erase(outlier_factors.begin() + inliers_idx[i - 1]);
+        it->second.consistent_factors.add(
+            it->second.factors[inliers_idx[i - 1]]);
       }
       it++;
       total_good_lc_ = total_good_lc_ + num_inliers;
+      pairwise_inconsistent_factors_.add(outlier_factors);
     }
 
     // iterate through landmarks and find inliers

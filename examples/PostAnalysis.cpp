@@ -12,6 +12,7 @@ author: Yun Chang
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/slam/dataset.h>
 
+#include <gtsam/inference/Symbol.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
@@ -21,7 +22,7 @@ double calculate_ape(const gtsam::Values& ground_truth,
   double error = 0;
   size_t compared_poses = 0;
   gtsam::KeyVector keys = estimate.keys();
-  for (gtsam::Key i : keys) {
+  for (gtsam::Symbol i : keys) {
     if (ground_truth.exists(i)) {
       compared_poses++;
       gtsam::Pose3 diff = estimate.at<gtsam::Pose3>(i).between(
@@ -33,12 +34,48 @@ double calculate_ape(const gtsam::Values& ground_truth,
   return error / compared_poses;
 }
 
+double calculate_ate(const gtsam::Values& ground_truth,
+                     const gtsam::Values& estimate) {
+  double error = 0;
+  size_t compared_poses = 0;
+  gtsam::KeyVector keys = estimate.keys();
+  for (gtsam::Symbol i : keys) {
+    if (ground_truth.exists(i)) {
+      compared_poses++;
+      gtsam::Pose3 diff = estimate.at<gtsam::Pose3>(i).between(
+          ground_truth.at<gtsam::Pose3>(i));
+      gtsam::Vector log_diff = gtsam::Pose3::Logmap(diff);
+      error =
+          error + std::sqrt(log_diff.tail(3).transpose() * log_diff.tail(3));
+    }
+  }
+  return error / compared_poses;
+}
+
+double calculate_are(const gtsam::Values& ground_truth,
+                     const gtsam::Values& estimate) {
+  double error = 0;
+  size_t compared_poses = 0;
+  gtsam::KeyVector keys = estimate.keys();
+  for (gtsam::Symbol i : keys) {
+    if (ground_truth.exists(i)) {
+      compared_poses++;
+      gtsam::Pose3 diff = estimate.at<gtsam::Pose3>(i).between(
+          ground_truth.at<gtsam::Pose3>(i));
+      gtsam::Vector log_diff = gtsam::Pose3::Logmap(diff);
+      error =
+          error + std::sqrt(log_diff.head(3).transpose() * log_diff.head(3));
+    }
+  }
+  return error / compared_poses;
+}
+
 double calculate_odom_consistency(
     const gtsam::Values& ground_truth,
     const gtsam::Values& estimate,
     const gtsam::NonlinearFactor::shared_ptr& new_factor) {
-  gtsam::Key front = new_factor->front();
-  gtsam::Key back = new_factor->back();
+  gtsam::Symbol front = new_factor->front();
+  gtsam::Symbol back = new_factor->back();
 
   gtsam::BetweenFactor<gtsam::Pose3> odom_factor =
       *boost::dynamic_pointer_cast<gtsam::BetweenFactor<gtsam::Pose3>>(
@@ -74,6 +111,9 @@ void separate_odometry_from_lc(const gtsam::NonlinearFactorGraph& input,
 int main(int argc, char* argv[]) {
   // usage: ./PostAnalysis gt_g2o results_folder
 
+  if (argc != 3) {
+    std::cout << "usage: ./PostAnalysis gt_g2o results_folder" << std::endl;
+  }
   // Load ground truth
   gtsam::GraphAndValues graphNValues_gt = gtsam::load3D(argv[1]);
   gtsam::Values values_gt = *graphNValues_gt.second;
@@ -103,9 +143,24 @@ int main(int argc, char* argv[]) {
   std::ofstream outfile;
   outfile.open(output_file, std::ios::out);
 
-  outfile
-      << "from to ape odom_consistency label(0=inliers 1=pw_incon 2=odom_rej)"
-      << std::endl;
+  outfile << "#from to ate are odom_consistency traj-len label(0=inliers "
+             "1=pw_incon "
+             "2=odom_rej)"
+          << std::endl;
+
+  // calculate for no loop closure
+  gtsam::NonlinearFactorGraph no_lc_nfg;
+  no_lc_nfg.add(odom_nfg);
+  // optimize
+  gtsam::LevenbergMarquardtParams params;
+  params.diagonalDamping = true;
+  gtsam::Values no_lc_values =
+      gtsam::LevenbergMarquardtOptimizer(no_lc_nfg, values, params).optimize();
+  double no_lc_ate = calculate_ate(values_gt, no_lc_values);
+  double no_lc_are = calculate_are(values_gt, no_lc_values);
+
+  outfile << 0 << " " << 0 << " " << no_lc_ate << " " << no_lc_are << " " << 0
+          << " " << 0 << " " << 0 << std::endl;
 
   // First loop through inliers and calculate ape
   for (size_t i = 0; i < inlier_factors.size(); i++) {
@@ -114,20 +169,19 @@ int main(int argc, char* argv[]) {
     test_nfg.add(inlier_factors[i]);
 
     // optimize
-    gtsam::LevenbergMarquardtParams params;
-    params.diagonalDamping = true;
     gtsam::Values test_values =
         gtsam::LevenbergMarquardtOptimizer(test_nfg, values, params).optimize();
-    double ape = calculate_ape(values_gt, test_values);
+    double ate = calculate_ate(values_gt, test_values);
+    double are = calculate_are(values_gt, test_values);
 
     double odom_consistency =
         calculate_odom_consistency(values_gt, test_values, inlier_factors[i]);
 
-    gtsam::Key front = inlier_factors[i]->front();
-    gtsam::Key back = inlier_factors[i]->back();
-
-    outfile << front << " " << back << " " << ape << " " << odom_consistency
-            << " " << 0 << std::endl;
+    gtsam::Symbol front = inlier_factors[i]->front();
+    gtsam::Symbol back = inlier_factors[i]->back();
+    size_t trajlen = abs(static_cast<int>(front.index() - back.index()));
+    outfile << front << " " << back << " " << ate << " " << are << " "
+            << odom_consistency << " " << trajlen << " " << 0 << std::endl;
   }
 
   // Then loop through pairwise inconsistent and calculate ape
@@ -141,16 +195,17 @@ int main(int argc, char* argv[]) {
     params.diagonalDamping = true;
     gtsam::Values test_values =
         gtsam::LevenbergMarquardtOptimizer(test_nfg, values, params).optimize();
-    double ape = calculate_ape(values_gt, test_values);
+    double ate = calculate_ate(values_gt, test_values);
+    double are = calculate_are(values_gt, test_values);
 
     double odom_consistency = calculate_odom_consistency(
         values_gt, test_values, pw_rejected_factors[i]);
 
-    gtsam::Key front = pw_rejected_factors[i]->front();
-    gtsam::Key back = pw_rejected_factors[i]->back();
-
-    outfile << front << " " << back << " " << ape << " " << odom_consistency
-            << " " << 1 << std::endl;
+    gtsam::Symbol front = pw_rejected_factors[i]->front();
+    gtsam::Symbol back = pw_rejected_factors[i]->back();
+    size_t trajlen = abs(static_cast<int>(front.index() - back.index()));
+    outfile << front << " " << back << " " << ate << " " << are << " "
+            << odom_consistency << " " << trajlen << " " << 1 << std::endl;
   }
 
   // Last loop through odom inconsistent and calculate ape
@@ -164,16 +219,17 @@ int main(int argc, char* argv[]) {
     params.diagonalDamping = true;
     gtsam::Values test_values =
         gtsam::LevenbergMarquardtOptimizer(test_nfg, values, params).optimize();
-    double ape = calculate_ape(values_gt, test_values);
+    double ate = calculate_ate(values_gt, test_values);
+    double are = calculate_are(values_gt, test_values);
 
     double odom_consistency = calculate_odom_consistency(
         values_gt, test_values, odom_rejected_factors[i]);
 
-    gtsam::Key front = odom_rejected_factors[i]->front();
-    gtsam::Key back = odom_rejected_factors[i]->back();
-
-    outfile << front << " " << back << " " << ape << " " << odom_consistency
-            << " " << 2 << std::endl;
+    gtsam::Symbol front = odom_rejected_factors[i]->front();
+    gtsam::Symbol back = odom_rejected_factors[i]->back();
+    size_t trajlen = abs(static_cast<int>(front.index() - back.index()));
+    outfile << front << " " << back << " " << ate << " " << are << " "
+            << odom_consistency << " " << trajlen << " " << 2 << std::endl;
   }
 
   outfile.close();

@@ -4,7 +4,7 @@ project(kimera_rpgo VERSION 1.0 LANGUAGES CXX)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
-set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -w")
+
 IF(APPLE)
     # Fix linking on 10.14+. See https://stackoverflow.com/questions/54068035
     LINK_DIRECTORIES(/usr/local/lib)
